@@ -19,7 +19,7 @@
 
 
 #include <vector>
-
+#include "gpu.h"
 
 using namespace OVR;
 
@@ -34,6 +34,7 @@ public:
 	void moveCamera(Vector3f &up, Vector3f &forward, Vector3f & pos);
 	void shutdown();
 	void destroy();
+	// intializes both openCL and GL
 	bool initializeGL(const int width, const int height);
 	bool LoadBuffers();
 
@@ -49,6 +50,9 @@ public:
 	GLuint fboID;
 	GLEContext gleContext;
 
+
+	//OpenCL context should be passed to till render function
+	std::unique_ptr<gpu::GPUContext> ctx;
 
 	ovrHmd HMD;
 	ovrHmdDesc hmdDesc;

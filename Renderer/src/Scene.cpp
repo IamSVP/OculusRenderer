@@ -51,9 +51,9 @@ void Scene::AddModel(const char *ObjPath,bool dynamic){
 
 }
 
-void Scene::Render(Matrix4f view, Matrix4f proj){
+void Scene::Render(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUContext> &ctx){
 
 	for (int i = 0; i < Models.size(); i++){
-		Models[i]->RenderModel(view, proj);
+		Models[i]->RenderModel(view, proj, ctx);
 	}
 }

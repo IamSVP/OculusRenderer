@@ -441,6 +441,7 @@ typedef struct
 
 STBIDEF stbi_uc *stbi_load               (char              const *filename,           int *x, int *y, int *comp, int req_comp);
 STBIDEF stbi_uc *stbi_load_from_memory   (stbi_uc           const *buffer, int len   , int *x, int *y, int *comp, int req_comp);
+STBIDEF void stbi_load_from_memory_into_dst(unsigned char *dst, stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp);
 STBIDEF stbi_uc *stbi_load_from_callbacks(stbi_io_callbacks const *clbk  , void *user, int *x, int *y, int *comp, int req_comp);
 STBIDEF void stbi_load_into_dst(unsigned char *dst, char const *filename, int *x, int *y, int *comp, int req_comp);
 

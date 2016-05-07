@@ -25,6 +25,10 @@ using namespace std;
 #include <vector>
 using namespace OVR;
 
+
+
+#include "gpu.h"
+#include "codec.h"
 struct Color
 {
 	unsigned char R, G, B, A;
@@ -42,6 +46,8 @@ struct Vertex
 	float     U, V;
 };
 
+typedef unsigned long long ull;
+
 class Model{
 public:
 	Model(const char * imagepath);
@@ -50,7 +56,7 @@ public:
 	Model(bool dynamic);
 	~Model();
 	void AllocateVertexBuffers();
-	void RenderModel(Matrix4f view, Matrix4f proj);
+	void RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUContext> &ctx);
 	void LoadTexture();
 	void LoadShaders(const char * vertex_file_path, const char * fragment_file_path);
 
@@ -60,12 +66,13 @@ public:
 	void InitializeTexture();
 	void InitializeCompressedTexture();
 
-	bool LoadTextureData(const char * imagepath);
-	bool LoadTextureData_JPG(const char * imagepath);
-	bool LoadTextureDataPBO(const char *imagepath);
-	bool CompressImage(const char *imagepath);
-	bool LoadCompressedTexture(const char *imagepath);
-	bool LoadCRNCompressedTexture(const char *imagepath);
+	bool LoadTextureData(const string imagepath);
+	bool LoadTextureDataJPG(const string imagepath);
+	bool LoadTextureDataPBO(const string imagepath);
+	bool CompressImage(const string imagepath);
+	bool LoadCompressedTextureDXT(const string imagepath);
+	bool LoadCompressedTextureCRN(const string imagepath);
+	bool LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu::GPUContext> &ctx);
 	void RenderDynamicModel(Matrix4f view, Matrix4f proj);
 
 
@@ -73,8 +80,6 @@ public:
 	Quatf Rotation;
 	Matrix4f ModelMatrix;
 	
-	
-
 	std::vector<unsigned short> indices;
 	std::vector<Vector3f> indexed_vertices;
 	std::vector<Vector2f> indexed_uvs;
@@ -88,7 +93,23 @@ public:
 	GLuint TextureID;
 	GLuint vertexArrayId;
 	GLbyte* TextureData;
-	GLuint PboID[2];
+	GLuint PboID;
+
+
+	uint32_t m_numframes;
+	std::vector<ull> m_CPULoad;
+	std::vector<ull> m_CPUDecode;
+	std::vector<ull> m_GPULoad;
+	std::vector<ull> m_GPUDecode;
+	std::vector<ull> m_TotalFps;
+	std::string m_TexturePath;
+	std::string m_TexturePathDXT;
+	std::string m_TexturePathJPG;
+	std::string m_TexturePathGTC;
+	std::string m_TexturePathCRN;
+
+	//OpenCL context;
+
 	bool DynamicModel;
 	int numIndices;
 	int TextureNumber;

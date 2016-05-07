@@ -1,7 +1,10 @@
 #include "OculusSystem.h"
 #include "Scene.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+//GLE_WGL_ENABLED
 #include "GLFW\glfw3.h"
-
+#include "GLFW\glfw3native.h"
 using namespace OVR;
 
 void OculusSystem::initialize(){
@@ -32,7 +35,7 @@ void OculusSystem::initialize(){
 	// Note: the mirror window can be any size, for this sample we use 1/2 the HMD resolution
 	ovrSizei windowSize = { hmdDesc.Resolution.w / 2, hmdDesc.Resolution.h / 2 };
 
-	if (initializeGL(100, 100))
+	if (initializeGL(hmdDesc.Resolution.w, hmdDesc.Resolution.h))
 		printf("Oculus System Initialized\n");
 	else
 		printf("Sorry Oculus System Initialization Failed\n");
@@ -63,18 +66,21 @@ bool OculusSystem::initializeGL(const int width, const int height)
 		glfwTerminate();
 		return false;
 	}
+	
 	glfwMakeContextCurrent(window);
-
 	// Putting VSync OFF , Oculus SDK controls the frame rate
 	glfwSwapInterval(0);
 
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
-
+	
 
 	// Initilizing GLE
 
 	OVR::GLEContext::SetCurrentContext(&gleContext);
+	gleContext.PlatformInit();
+          int attribList[] = { WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 2, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB };
+            HGLRC h = wglCreateContextAttribsARB(wglGetCurrentDC(), wglGetCurrentContext(), attribList);
 	gleContext.Init();
 
 
@@ -88,6 +94,9 @@ bool OculusSystem::initializeGL(const int width, const int height)
 
 	//glFrontFace(GL_CCW);
 	//glEnable(GL_CULL_FACE);
+
+	//Initialize OpenCL 
+	ctx = gpu::GPUContext::InitializeOpenCL(true);
 
 	return true;
 }
@@ -231,7 +240,7 @@ void OculusSystem::render(){
 				Matrix4f view = Matrix4f::LookAtRH(shiftedEyePos, shiftedEyePos + finalForward, finalUp);
 				Matrix4f proj = ovrMatrix4f_Projection(hmdDesc.DefaultEyeFov[eye], 0.2f, 1000.0f, ovrProjection_RightHanded);
 
-				scene->Render(view, proj);
+				scene->Render(view, proj, ctx);
 				eyeRenderTexture[eye]->UnsetRenderSurface();
 			}
 		}

@@ -1,0 +1,3 @@
+[submodule "GenTC"]
+	path = GenTC
+	url = https://github.com/Mokosha/GenTC.git

@@ -1,17 +1,4 @@
 //
-//#include <squish\squish.h>
-//#include <cstdio>
-//#include <cstdlib>
-//#include <iostream>
-//#include <fstream>
-//#define STB_IMAGE_IMPLEMENTATION
-//#include "stb_image.h"
-//
-//static const size_t kImageWidth = 1920;
-//static const size_t kImageHeight = 1080;
-//
-//
-//using namespace squish;
 
 
 #include "OculusSystem.h"

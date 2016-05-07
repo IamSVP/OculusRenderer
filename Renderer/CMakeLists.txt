@@ -10,6 +10,14 @@ include_directories("${OculusRenderer_SOURCE_DIR}/OculusSDK/LibOVRKernel/src")
 include_directories("${OculusRenderer_SOURCE_DIR}/OculusSDK/LibOVR/Include/")
 
 
+#GENTC Include files....
+include_directories("${OculusRenderer_SOURCE_DIR}/GenTC/demo")
+include_directories("${OculusRenderer_BINARY_DIR}/GenTC/demo")
+
+include_directories("${OculusRenderer_SOURCE_DIR}/GenTC/codec")
+include_directories("${OculusRenderer_SOURCE_DIR}/GenTC/gpu")
+include_directories(${OPENCL_INCLUDE_DIRS})
+
 INCLUDE_DIRECTORIES(${OculusRenderer_SOURCE_DIR}/googletest/include)
 INCLUDE_DIRECTORIES("Include/")
 
@@ -37,6 +45,10 @@ SET( SOURCES
 ADD_EXECUTABLE( Renderer ${HEADERS} ${SOURCES})
 TARGET_LINK_LIBRARIES( Renderer glfw )
 TARGET_LINK_LIBRARIES(Renderer ovr)
+TARGET_LINK_LIBRARIES(Renderer ans)
+TARGET_LINK_LIBRARIES(Renderer gentc_gpu)
+TARGET_LINK_LIBRARIES(Renderer gentc_codec)
 TARGET_LINK_LIBRARIES(Renderer ${GLFW_LIBRARIES})
 TARGET_LINK_LIBRARIES(Renderer GLEW_1130)
+TARGET_LINK_LIBRARIES(Renderer ${OPENCL_LIBRARIES})
 TARGET_LINK_LIBRARIES(Renderer ${OPENGL_LIBRARY})

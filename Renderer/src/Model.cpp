@@ -4,14 +4,29 @@
 #include <chrono>
 #include <fstream>
 #include <algorithm>
-#define STB_IMAGE_IMPLEMENTATION
+#include <numeric>
+#include <vector>
 #include "stb_image.h"
+namespace stbi {
+
+
 #include "crn_decomp.h"
-static const size_t kImageWidth = 512; 
-static const size_t kImageHeight = 512;
+}
+
+static const size_t kImageWidth = 2560; 
+static const size_t kImageHeight = 1280;
 
 
 
+
+//#define FOURK
+#define TWOK
+#define CRN
+//#define GTC
+//#define DXT1
+//#define JPG
+#define PBO
+#define MAX_TEXTURES 588
 GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_path)
 {
 
@@ -217,8 +232,7 @@ static const char *GetGLErrString(GLenum err) {
 
 
 //-----------------Loading Texture functions------------------//
-
-bool Model::LoadCompressedTexture(const char *imagepath){
+bool Model::LoadCompressedTextureDXT(const string imagepath){
 
 	unsigned char *Pixel = NULL;
 	unsigned char *blocks;
@@ -226,27 +240,28 @@ bool Model::LoadCompressedTexture(const char *imagepath){
 	std::basic_ifstream<unsigned char> input(imagepath, std::ios::in | std::ios::binary);
 	//std::ifstream input(imagepath, std::ios::binary);
 	
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID[NextIdx]);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
 
 	blocks = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	if (blocks)
 	{
-		std::chrono::high_resolution_clock::time_point load_start =
+		std::chrono::high_resolution_clock::time_point CPUload_start =
 			std::chrono::high_resolution_clock::now();
 
 
 		input.read(blocks, (kImageHeight*kImageWidth / 2));
 
 
-		std::chrono::high_resolution_clock::time_point cpu_load_end =
+		std::chrono::high_resolution_clock::time_point CPUload_end =
 			std::chrono::high_resolution_clock::now();
 
 		std::chrono::duration<double> load_time_cpu =
-			std::chrono::duration_cast<std::chrono::duration<double>>(cpu_load_end - load_start);
-		std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
+			std::chrono::duration_cast<std::chrono::duration<double>>(CPUload_end - CPUload_start);
+		//std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
+		m_CPULoad.push_back(load_time_cpu.count());
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 	}
-
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
 	glBindTexture(GL_TEXTURE_2D, TextureID);
 
 	glCompressedTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
@@ -257,6 +272,9 @@ bool Model::LoadCompressedTexture(const char *imagepath){
 		GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,          // Data format
 		kImageWidth*kImageHeight / 2, // Type of texture data
 		0);     // 
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
 
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -265,29 +283,35 @@ bool Model::LoadCompressedTexture(const char *imagepath){
 	return true;
 }
 
-bool Model::LoadTextureData_JPG(const char * fileName){
+bool Model::LoadTextureDataJPG(const string fileName){
+
+	unsigned char *ImageDataPtr = (unsigned char *)malloc((kImageHeight * kImageWidth * 4));
+	FILE *fp = fopen(fileName.c_str() , "rb");
 
 
-	std::chrono::high_resolution_clock::time_point load_start = 
-		std::chrono::high_resolution_clock::now();
+	//CPU LOADING.....
+	std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+	fread(ImageDataPtr, 1, kImageHeight * kImageWidth * 4, fp);
+	std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+	std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+	m_CPULoad.push_back(CPULoad_Time.count());
+
+
+	std::chrono::high_resolution_clock::time_point CPUDecode_Start = std::chrono::high_resolution_clock::now();
 
 	int x, y, n;
-	unsigned char *textureData = stbi_load(fileName, &x, &y, &n, 4);
+	unsigned char *textureData = stbi_load_from_memory(ImageDataPtr, (kImageHeight * kImageWidth * 4), &x, &y, &n, 4);
 	assert(x == kImageWidth);
 	assert(y == kImageHeight);
+	std::chrono::high_resolution_clock::time_point CPUDecode_End = std::chrono::high_resolution_clock::now();
 
-
-	std::chrono::high_resolution_clock::time_point cpu_load_end =
-		std::chrono::high_resolution_clock::now();
-
-	std::chrono::duration<double> load_time_cpu =
-		std::chrono::duration_cast<std::chrono::duration<double>>(cpu_load_end - load_start);
-	std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
+	std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
+	m_CPUDecode.push_back(CPUDecode_Time.count());
 
 	// Generate a texture ID and bind to it
 	//		cout << "There was an error loading the texture: " << fileName << endl;
-
-	cout << "See"<<fileName<< endl;
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
 	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
 
 	// Construct the texture.
@@ -303,98 +327,55 @@ bool Model::LoadTextureData_JPG(const char * fileName){
 		textureData);     // The image data to use for this texture
 
 	glBindTexture(GL_TEXTURE_2D, 0);
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
 	// Specify our minification and magnification filters
 	
-
-
-	// Check for OpenGL texture creation errors
-	/* glError = glGetError();
-	if (glError)
-	{
-		cout << "There was an error loading the texture: " << fileName << endl;
-
-		switch (glError)
-		{
-		case GL_INVALID_ENUM:
-			cout << "Invalid enum." << endl;
-			break;
-
-		case GL_INVALID_VALUE:
-			cout << "Invalid value." << endl;
-			break;
-
-		case GL_INVALID_OPERATION:
-			cout << "Invalid operation." << endl;
-
-		default:
-			cout << "Unrecognised GLenum." << endl;
-			break;
-		}
-
-		cout << "See https://www.opengl.org/sdk/docs/man/html/glTexImage2D.xhtml for further details." << endl;
-	}*/
-
-#if 0
-	// Unload the 32-bit colour bitmap
-	FreeImage_Unload(bitmap32);
-
-	// If we had to do a conversion to 32-bit colour, then unload the original
-	// non-32-bit-colour version of the image data too. Otherwise, bitmap32 and
-	// bitmap point at the same data, and that data's already been free'd, so
-	// don't attempt to free it again! (or we'll crash).
-	if (bitsPerPixel != 32)
-	{
-		FreeImage_Unload(bitmap);
-	}
-#else
 	stbi_image_free(textureData);
-#endif
 
-	std::chrono::high_resolution_clock::time_point load_end =
-		std::chrono::high_resolution_clock::now();
-
-	std::chrono::duration<double> load_time = 
-		std::chrono::duration_cast<std::chrono::duration<double>>(load_end - load_start);
-	std::cout << "Load time: " << load_time.count() << "(s)" << std::endl;
-
-	// Finally, return the texture ID
+		// Finally, return the texture ID
 	return true;
 
 }
 
-bool Model::LoadTextureDataPBO(const char *imagepath){
+bool Model::LoadTextureDataPBO(const string imagepath){
 	GLubyte *textureData;
 	int Idx = 0, NextIdx = 0;
 	
-	// Generate a texture ID and bind to it
-	//		cout << "There was an error loading the texture: " << fileName << endl;
-	std::chrono::high_resolution_clock::time_point decode_start;
-	std::chrono::high_resolution_clock::time_point decode_end;
+	unsigned char *ImageDataPtr = (unsigned char *)malloc((kImageHeight * kImageWidth * 4));
+	FILE *fp = fopen(imagepath.c_str() , "rb");
 
 
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID[Idx]);
+	//CPU LOADING.....
+	std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+	fread(ImageDataPtr, 1, kImageHeight * kImageWidth * 4, fp);
+	std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+	std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+	m_CPULoad.push_back(CPULoad_Time.count());
+
+
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
 	textureData = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	if (textureData){
 
-		 decode_start =
-			std::chrono::high_resolution_clock::now();
-
+		
+		std::chrono::high_resolution_clock::time_point CPUDecode_Start = std::chrono::high_resolution_clock::now();
 		int x, y, n;
-		stbi_load_into_dst(textureData, imagepath, &x, &y, &n, 4);
+		stbi_load_from_memory_into_dst(textureData, ImageDataPtr,(kImageWidth * kImageHeight * 4) , &x, &y, &n, 4);
+		std::chrono::high_resolution_clock::time_point CPUDecode_End = std::chrono::high_resolution_clock::now();
 
-		 decode_end =
-			std::chrono::high_resolution_clock::now();
-
-		std::chrono::duration<double> decode_time_cpu =
-			std::chrono::duration_cast<std::chrono::duration<double>>(decode_end - decode_start);
-		std::cout << "CPU  time: " << decode_time_cpu.count() << "(s)" << std::endl;
+		std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
+		m_CPUDecode.push_back(CPUDecode_Time.count());
+		
 		assert(x == kImageWidth);
 		assert(y == kImageHeight);
 		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 	}
 
 	
-
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
 	glBindTexture(GL_TEXTURE_2D, TextureID);
 	glTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
 		0,                // level (0 being the top level i.e. full size)
@@ -408,19 +389,108 @@ bool Model::LoadTextureDataPBO(const char *imagepath){
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	
-	std::chrono::high_resolution_clock::time_point gpu_load_end =
-		std::chrono::high_resolution_clock::now();
-
-	std::chrono::duration<double> cpu_to_gpu =
-		std::chrono::duration_cast<std::chrono::duration<double>>(gpu_load_end - decode_end);
-	std::cout << "CPU to GPU: " << cpu_to_gpu.count() << "(s)" << std::endl;
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
 	//stbi_image_free(textureData);
 	return true;
 }
 
+bool Model::LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu::GPUContext> &ctx) {
+ GenTC::GenTCHeader hdr;
+  // Load in compressed data.
+  double start_time = glfwGetTime();
+  std::ifstream is (imagepath.c_str(), std::ifstream::binary);
+  if (!is) {
+    assert(!"Error opening GenTC texture!");
+	return false;
+  }
+
+  is.seekg(0, is.end);
+  size_t length = static_cast<size_t>(is.tellg());
+  is.seekg(0, is.beg);
+
+  static const size_t kHeaderSz = sizeof(hdr);
+  const size_t mem_sz = length - kHeaderSz;
+
+  is.read(reinterpret_cast<char *>(&hdr), kHeaderSz);
+
+  std::vector<uint8_t> cmp_data(mem_sz + 512);
+  is.read(reinterpret_cast<char *>(cmp_data.data()) + 512, mem_sz);
+  assert(is);
+  assert(is.tellg() == static_cast<std::streamoff>(length));
+  is.close();
+  
+  const cl_uint num_blocks = hdr.height * hdr.width / 16;
+  cl_uint *offsets = reinterpret_cast<cl_uint *>(cmp_data.data());
+  cl_uint output_offset = 0;
+  offsets[0] = output_offset; output_offset += 2 * num_blocks; // Y planes
+  offsets[1] = output_offset; output_offset += 4 * num_blocks; // Chroma planes
+  offsets[2] = output_offset; output_offset += static_cast<cl_uint>(hdr.palette_bytes); // Palette
+  offsets[3] = output_offset; output_offset += num_blocks; // Indices
+
+  cl_uint input_offset = 0;
+  offsets[4] = input_offset; input_offset += hdr.y_cmp_sz;
+  offsets[5] = input_offset; input_offset += hdr.chroma_cmp_sz;
+  offsets[6] = input_offset; input_offset += hdr.palette_sz;
+  offsets[7] = input_offset; input_offset += hdr.indices_sz;
+
+  // Create the data for OpenCL
+  cl_int errCreateBuffer;
+  cl_mem_flags flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR | CL_MEM_HOST_NO_ACCESS;
+  cl_mem cmp_buf = clCreateBuffer(ctx->GetOpenCLContext(), flags, cmp_data.size(),
+                                  const_cast<uint8_t *>(cmp_data.data()), &errCreateBuffer);
+  CHECK_CL((cl_int), errCreateBuffer);
+
+  // Create an OpenGL handle to our pbo
+  // !SPEED! We don't need to recreate this every time....
+  cl_mem output = clCreateFromGLBuffer(ctx->GetOpenCLContext(), CL_MEM_READ_WRITE, PboID,
+                                       &errCreateBuffer);
+  CHECK_CL((cl_int), errCreateBuffer);
+
+  cl_command_queue queue = ctx->GetNextQueue();
+
+  // Acquire the PBO
+  cl_event acquire_event;
+  CHECK_CL(clEnqueueAcquireGLObjects, queue, 1, &output, 0, NULL, &acquire_event);
+
+  // Load it
+  cl_event cmp_event;
+
+    cmp_event = GenTC::LoadCompressedDXT(ctx, hdr, queue, cmp_buf, output, acquire_event);
+ 
+
+  // Release the PBO
+  cl_event release_event;
+  CHECK_CL(clEnqueueReleaseGLObjects, queue, 1, &output, 1, &cmp_event, &release_event);
+
+  CHECK_CL(clFlush, ctx->GetDefaultCommandQueue());
+
+  // Wait on the release
+  CHECK_CL(clWaitForEvents, 1, &release_event);
+
+  // Cleanup CL
+  CHECK_CL(clReleaseMemObject, cmp_buf);
+  CHECK_CL(clReleaseMemObject, output);
+  CHECK_CL(clReleaseEvent, acquire_event);
+  CHECK_CL(clReleaseEvent, release_event);
+  CHECK_CL(clReleaseEvent, cmp_event);
+
+  // Copy the texture over
+  GLsizei width = static_cast<GLsizei>(hdr.width);
+  GLsizei height = static_cast<GLsizei>(hdr.height);
+  GLsizei dxt_size = (width * height) / 2;
+  CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, PboID);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+  CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D, 0, 0, 0, hdr.width, hdr.height,
+                                        GL_COMPRESSED_RGB_S3TC_DXT1_EXT, dxt_size, 0);
+  CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
 
-static crn_uint8 *read_file_into_buffer(const char *pFilename, crn_uint32 &size)
+	return false;
+}
+
+static stbi::crn_uint8 *read_file_into_buffer(const char *pFilename, stbi::crn_uint32 &size)
 {
 	size = 0;
 
@@ -433,7 +503,7 @@ static crn_uint8 *read_file_into_buffer(const char *pFilename, crn_uint32 &size)
 	size = ftell(pFile);
 	fseek(pFile, 0, SEEK_SET);
 
-	crn_uint8 *pSrc_file_data = static_cast<crn_uint8*>(malloc(std::max(1U, size)));
+	stbi::crn_uint8 *pSrc_file_data = static_cast<stbi::crn_uint8*>(malloc(std::max(1U, size)));
 	if ((!pSrc_file_data) || (fread(pSrc_file_data, size, 1, pFile) != 1))
 	{
 		fclose(pFile);
@@ -446,49 +516,51 @@ static crn_uint8 *read_file_into_buffer(const char *pFilename, crn_uint32 &size)
 	return pSrc_file_data;
 }
 
-bool Model::LoadCRNCompressedTexture(const char *imagepath){
+bool Model::LoadCompressedTextureCRN(const string imagepath){
 
-	crn_uint32 src_file_size;
-	std::chrono::high_resolution_clock::time_point disk_load_start =
-		std::chrono::high_resolution_clock::now();
-	crn_uint8 *pSrc_file_data = read_file_into_buffer(imagepath, src_file_size);
+	stbi::crn_uint32 src_file_size;
+	std::chrono::high_resolution_clock::time_point CPULoad_Start = std::chrono::high_resolution_clock::now();
+	stbi::crn_uint8 *pSrc_file_data = read_file_into_buffer(imagepath.c_str(), src_file_size);
 	
 	if (!pSrc_file_data)
 		std::cout << "error in file reading\n";
 
 
-    std::chrono::high_resolution_clock::time_point disk_load_end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> disk_load_duration = std::chrono::duration_cast<std::chrono::duration<double>>(disk_load_start-disk_load_end);     
+	std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
 
-    std::cout << "Disk to CPU load time::" << disk_load_duration.count() << std::endl;
+	std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+	m_CPULoad.push_back(CPULoad_Time.count());
 
-
-	crnd::crn_texture_info tex_info;
-	if (!crnd::crnd_get_texture_info(pSrc_file_data, src_file_size, &tex_info))
+	std::chrono::high_resolution_clock::time_point CPUDecode_Start = std::chrono::high_resolution_clock::now();
+	stbi::crnd::crn_texture_info tex_info;
+	if (!stbi::crnd::crnd_get_texture_info(pSrc_file_data, src_file_size, &tex_info))
 	{
 		free(pSrc_file_data);
 		std::cout << "crnd_get_texture_info() failed!\n";
 	}
-	const crn_uint32 width = std::max(1U, tex_info.m_width >> 0);
-	const crn_uint32 height = std::max(1U, tex_info.m_height >> 0);
-	const crn_uint32 blocks_x = std::max(1U, (width + 3) >> 2);
-	const crn_uint32 blocks_y = std::max(1U, (height + 3) >> 2);
-	const crn_uint32 row_pitch = blocks_x * crnd::crnd_get_bytes_per_dxt_block(tex_info.m_format);
-	const crn_uint32 total_face_size = row_pitch * blocks_y;
+	const stbi::crn_uint32 width = std::max(1U, tex_info.m_width >> 0);
+	const stbi::crn_uint32 height = std::max(1U, tex_info.m_height >> 0);
+	const stbi::crn_uint32 blocks_x = std::max(1U, (width + 3) >> 2);
+	const stbi::crn_uint32 blocks_y = std::max(1U, (height + 3) >> 2);
+	const stbi::crn_uint32 row_pitch = blocks_x * stbi::crnd::crnd_get_bytes_per_dxt_block(tex_info.m_format);
+	const stbi::crn_uint32 total_face_size = row_pitch * blocks_y;
 
 
-	crnd::crnd_unpack_context pContext = crnd::crnd_unpack_begin(pSrc_file_data, src_file_size);
+	stbi::crnd::crnd_unpack_context pContext = stbi::crnd::crnd_unpack_begin(pSrc_file_data, src_file_size);
 	
 	void *TextureData;
 	TextureData = malloc(kImageWidth*kImageHeight / 2);
-	crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
+	stbi::crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
 	std::chrono::high_resolution_clock::time_point cpu_load_end =
 		std::chrono::high_resolution_clock::now();
+	std::chrono::high_resolution_clock::time_point CPUDecode_End = std::chrono::high_resolution_clock::now();
 
-	std::chrono::duration<double> load_time_cpu =
-		std::chrono::duration_cast<std::chrono::duration<double>>(cpu_load_end - disk_load_end);
-	std::cout << "CPU Decode time: " << load_time_cpu.count() << "(s)" << std::endl;
+	std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
+	m_CPUDecode.push_back(CPUDecode_Time.count());
     
+	
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+
 	glBindTexture(GL_TEXTURE_2D, TextureID);
     //glDrawPixels
 	glCompressedTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
@@ -499,13 +571,11 @@ bool Model::LoadCRNCompressedTexture(const char *imagepath){
 		GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,          // Data format
 		kImageWidth*kImageHeight / 2, // Type of texture data
 		TextureData);
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
 	glBindTexture(GL_TEXTURE_2D, 0);
-	std::chrono::high_resolution_clock::time_point gpu_load_end =
-		std::chrono::high_resolution_clock::now();
-
-	std::chrono::duration<double> cpu_to_gpu =
-		std::chrono::duration_cast<std::chrono::duration<double>>(gpu_load_end - cpu_load_end);
-	std::cout << "CPU to GPU: " << cpu_to_gpu.count() << "(s)" << std::endl;
+	
 	free(TextureData);
 	return true;
 }
@@ -556,10 +626,8 @@ void Model::InitializeTexture(){
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glGenBuffers(2, PboID);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER,PboID[0]);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, kImageHeight*kImageWidth * 4, 0, GL_STREAM_DRAW);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID[1]);
+	glGenBuffers(1, &PboID);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER,PboID);
 	glBufferData(GL_PIXEL_UNPACK_BUFFER, kImageHeight*kImageWidth * 4, 0, GL_STREAM_DRAW);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
@@ -575,11 +643,9 @@ void Model::InitializeCompressedTexture(){
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glGenBuffers(2, PboID);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID[0]);
+	glGenBuffers(1, &PboID);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
 	glBufferData(GL_PIXEL_UNPACK_BUFFER, (kImageHeight*kImageWidth)/2, 0, GL_STREAM_DRAW);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID[1]);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, (kImageHeight*kImageWidth) / 2, 0, GL_STREAM_DRAW);
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 
@@ -605,7 +671,21 @@ Model::Model(bool dynamic){
 
 	DynamicModel = dynamic;
 	TextureNumber = 0;
+#ifdef TWOK
+	m_TexturePath = "C:\\Users\\psrihariv\\Google Drive\\Video Datasets\\360MegaCoaster2K\\";
+	m_TexturePathCRN = m_TexturePath + "CRN\\360MegaC2K";
+	m_TexturePathDXT = m_TexturePath + "DXT1\\360MegaC2K";
+	m_TexturePathJPG = m_TexturePath + "JPG\\360MegaC2K";
+	m_TexturePathGTC = m_TexturePath + "GTC\\360MegaC2K";
+#endif	
 
+#ifdef FOURK
+	m_TexturePath = "C:\\Users\\psrihariv\\Google Drive\\Video Datasets\\360MegaCoaster4K\\";
+	m_TexturePathCRN = m_TexturePath + "CRN\\360MegaC4K";
+	m_TexturePathDXT = m_TexturePath + "DXT1\\360MegaC4K";
+	m_TexturePathJPG = m_TexturePath + "JPG\\360MegaC4K";
+	m_TexturePathGTC = m_TexturePath + "GTC\\360MegaC4K";
+#endif	
 }
 
 void Model::AllocateVertexBuffers(){
@@ -648,7 +728,7 @@ Model::~Model(){
 	glDeleteBuffers(1, &IndexBuffer);
 	glDeleteProgram(ProgramID);
 	glDeleteTextures(1, &TextureID);
-	glDeleteBuffers(2, PboID);
+	glDeleteBuffers(1, &PboID);
 	glDeleteVertexArrays(1, &vertexArrayId);
 
 }
@@ -659,10 +739,11 @@ void Model::LoadShaders(const char * vertex_file_path, const char * fragment_fil
 
 }
 
-
 //---------------------Render function call glbind calls, glDraw calss-----------------//
-void Model::RenderModel(Matrix4f view, Matrix4f proj){
+void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUContext> &ctx){
 
+	//Start of a timer
+	std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 
 	Matrix4f Model = Matrix4f::Scaling(Vector3f(8.0f,6.0f,5.0f));
 	Matrix4f MVP = proj * view*Model;
@@ -676,22 +757,33 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj){
 	glUniform3f(glGetUniformLocation(ProgramID, "LightPosition_worldspace"), lightPos.x, lightPos.y, lightPos.z);
 
 	glActiveTexture(GL_TEXTURE0);
-	
-	if (DynamicModel){
-		char fileName[256];
-		
-		//"RenderStuff//Textures//sunset//frame%04d.jpg" 
-		//..//Evaluation//ImageDatasets//Pixar128//DXT1//Pixar%05d.DXT1
-		//..//Evaluation//ImageDatasets//ReTragetME//DXT1//ReTargetME%05d.DXT1
-		// ..//Evaluation//ImageDatasets\\Pixar128\\CRN\\Pixar%05d.CRN
-		TextureNumber = 1;
-		sprintf(fileName, "..//Evaluation//ImageDatasets//Pixar_normal//CRN//compressed//Pixar_normal%05d.CRN", TextureNumber);
-		LoadCRNCompressedTexture(fileName);
-		//LoadCompressedTexture(fileName);
-		//LoadTextureDataPBO(fileName);
 
-		if (TextureNumber > 157)
-			TextureNumber = 0;
+	char cNumber[10];
+	sprintf(cNumber, "%03d", TextureNumber);
+	std::string number(cNumber);
+	TextureNumber = (TextureNumber + 1) % MAX_TEXTURES;
+	if (DynamicModel){
+		std::string imagepath;
+#ifdef JPG
+		imagepath = m_TexturePathJPG + number + ".jpg";
+		LoadTextureDataJPG(imagepath);
+#endif	
+
+#ifdef CRN
+		imagepath = m_TexturePathCRN + number +".CRN";
+		LoadCompressedTextureCRN(imagepath);
+#endif
+
+#ifdef DXT1
+		imagepath = m_TexturePathDXT + number + ".DXT1";
+		LoadCompressedTextureDXT(imagepath);
+#endif
+
+#ifdef GTC
+		imagepath = m_TexturePathGTC + number + ".gtc";
+		LoadCompressedTextureGTC(imagepath, ctx);
+#endif
+		
 	}
 
 	glBindTexture(GL_TEXTURE_2D, TextureID);
@@ -720,7 +812,9 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj){
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
 	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_SHORT, NULL);
-
+	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds frame_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+	m_TotalFps.push_back(frame_time.count());
 	glDisableVertexAttribArray(vertexPosition_modelspace);
 	glDisableVertexAttribArray(vertexNormal_modelspace);
 	glDisableVertexAttribArray(vertexUV);
@@ -729,5 +823,46 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj){
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	glUseProgram(0);
+
+	m_numframes = m_numframes + 1;
+	if (m_numframes >= 10) {
+
+		ull CPU_load, CPU_decode, GPU_Load, FPS;
+		ull GCPU_load, GCPU_decode, GGPU_Load, GFPS;
+
+		if (!m_CPULoad.empty()) {
+			CPU_load = std::accumulate(m_CPULoad.begin(), m_CPULoad.end(), 0) / m_CPULoad.size();
+
+		}
+
+		if (!m_CPUDecode.empty()) {
+			CPU_decode = std::accumulate(m_CPUDecode.begin(), m_CPUDecode.end(), 0) / m_CPUDecode.size();
+
+		}
+
+		if (!m_GPULoad.empty()) {
+			GPU_Load = std::accumulate(m_GPULoad.begin(), m_GPULoad.end(), 0) / m_GPULoad.size();
+
+		}
+
+		if (!m_TotalFps.empty()) {
+			FPS = std::accumulate(m_TotalFps.begin(), m_TotalFps.end(), 0) / m_TotalFps.size();
+
+		}
+
+		printf("CPU Load Time : %lld--%d\n", CPU_load, m_CPULoad.size());
+		printf("CPU Decode Time: %lld--%d\n", CPU_decode, m_CPUDecode.size());
+		printf("GPU Load Time: %lld--%d\n", GPU_Load, m_GPULoad.size());
+		printf("FPS: %lld--%d\n", FPS, m_TotalFps.size());
+
+		m_CPULoad.clear();
+		m_CPUDecode.clear();
+		m_GPULoad.clear();
+		m_TotalFps.clear();
+
+
+		m_numframes = 0;
+	}
+
 
 }

@@ -3,6 +3,10 @@
 
 #include "Model.h"
 
+//Forward Declaration 
+class GPUContext;
+
+
 class Scene{
 
 public:
@@ -11,7 +15,7 @@ public:
 	void AddModel();
 	void CreateScene();
 	void AddModel(const char *ObjPath,bool dynamic);
-	void Render(Matrix4f view, Matrix4f proj);
+	void Render(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUContext> &ctx);
 
 
 	vector<Model*> Models;
