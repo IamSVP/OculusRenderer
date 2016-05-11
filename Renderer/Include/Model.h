@@ -94,6 +94,8 @@ public:
 	GLuint vertexArrayId;
 	GLbyte* TextureData;
 	GLuint PboID;
+	GLuint MVPID;
+	GLuint texID;
 
 
 	uint32_t m_numframes;

@@ -30,7 +30,7 @@ void Scene::CreateScene(){
 	m->indices.push_back(1);
 	m->indices.push_back(2);
 	m->indices.push_back(3); 
-	m->LoadShaders("RenderStuff//Shaders//StandardShading.vs", "RenderStuff//Shaders//SimpleFragmentShader.fgs");
+	m->LoadShaders("RenderStuff//Shaders//SimpleVertexShader.vs", "RenderStuff//Shaders//SimpleFragmentShader.fgs");
 	m->InitializeCompressedTexture();
 	//m->InitializeTexture();
 	m->AllocateVertexBuffers();

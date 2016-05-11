@@ -13,12 +13,6 @@ namespace stbi {
 #include "crn_decomp.h"
 }
 
-static const size_t kImageWidth = 2560; 
-static const size_t kImageHeight = 1280;
-
-
-
-
 //#define FOURK
 #define TWOK
 #define CRN
@@ -27,12 +21,54 @@ static const size_t kImageHeight = 1280;
 //#define JPG
 #define PBO
 #define MAX_TEXTURES 588
+
+#ifdef FOURK
+#ifdef GTC
+static const size_t kImageWidth = 3584; 
+static const size_t kImageHeight = 1792;
+#else
+static const size_t kImageWidth = 3840;
+static const size_t kImageHeight = 1920;
+#endif
+#else
+static const size_t kImageWidth = 2560; 
+static const size_t kImageHeight = 1280;
+#endif
+
+#ifndef NDEBUG
+
+static const char *GetGLErrString(GLenum err) {
+	const char *errString = "Unknown error";
+	switch (err) {
+	case GL_INVALID_ENUM: errString = "Invalid enum"; break;
+	case GL_INVALID_VALUE: errString = "Invalid value"; break;
+	case GL_INVALID_OPERATION: errString = "Invalid operation"; break;
+	}
+	return errString;
+}
+
+#define CHECK_GL(fn, ...)  \
+	fn(__VA_ARGS__);               \
+    do { \
+	  GLenum glError = glGetError(); \
+      if (glError != GL_NO_ERROR)	{ \
+	    const char *errString = GetGLErrString(glError); \
+		printf("GL-ERROR-%s", errString); \
+	    assert(false); \
+      } \
+   } \
+   while (0)
+#else
+#define CHECK_GL(fn, ...)  fn(__VA_ARGS__)
+#endif
+
+
 GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_path)
 {
 
 	// Create the shaders
-	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint VertexShaderID = CHECK_GL(glCreateShader,GL_VERTEX_SHADER);
+	GLuint FragmentShaderID = CHECK_GL(glCreateShader,GL_FRAGMENT_SHADER);
 
 	// Read the Vertex Shader code from the file
 	std::string VertexShaderCode;
@@ -69,15 +105,15 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
 	// Compile Vertex Shader
 	printf("Compiling shader : %s\n", vertex_file_path);
 	char const * VertexSourcePointer = VertexShaderCode.c_str();
-	glShaderSource(VertexShaderID, 1, &VertexSourcePointer, NULL);
-	glCompileShader(VertexShaderID);
+	CHECK_GL(glShaderSource,VertexShaderID, 1, &VertexSourcePointer, NULL);
+	CHECK_GL(glCompileShader,VertexShaderID);
 
 	// Check Vertex Shader
-	glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
-	glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	CHECK_GL(glGetShaderiv,VertexShaderID, GL_COMPILE_STATUS, &Result);
+	CHECK_GL(glGetShaderiv, VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
 	if (InfoLogLength > 0) {
 		std::vector<char> VertexShaderErrorMessage(InfoLogLength + 1);
-		glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
+		CHECK_GL(glGetShaderInfoLog, VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
 		printf("%s\n", &VertexShaderErrorMessage[0]);
 	}
 
@@ -86,15 +122,15 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
 	// Compile Fragment Shader
 	printf("Compiling shader : %s\n", fragment_file_path);
 	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
-	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer, NULL);
-	glCompileShader(FragmentShaderID);
+	CHECK_GL(glShaderSource, FragmentShaderID, 1, &FragmentSourcePointer, NULL);
+	CHECK_GL(glCompileShader, FragmentShaderID);
 
 	// Check Fragment Shader
-	glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
-	glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	CHECK_GL(glGetShaderiv, FragmentShaderID, GL_COMPILE_STATUS, &Result);
+	CHECK_GL(glGetShaderiv, FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
 	if (InfoLogLength > 0) {
 		std::vector<char> FragmentShaderErrorMessage(InfoLogLength + 1);
-		glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
+		CHECK_GL(glGetShaderInfoLog, FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
 		printf("%s\n", &FragmentShaderErrorMessage[0]);
 	}
 
@@ -102,22 +138,22 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
 
 	// Link the program
 	printf("Linking program\n");
-	GLuint ProgramID = glCreateProgram();
-	glAttachShader(ProgramID, VertexShaderID);
-	glAttachShader(ProgramID, FragmentShaderID);
-	glLinkProgram(ProgramID);
+	GLuint ProgramID = CHECK_GL(glCreateProgram);
+	CHECK_GL(glAttachShader,ProgramID, VertexShaderID);
+	CHECK_GL(glAttachShader, ProgramID, FragmentShaderID);
+	CHECK_GL(glLinkProgram, ProgramID);
 
 	// Check the program
-	glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
-	glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	CHECK_GL(glGetProgramiv,ProgramID, GL_LINK_STATUS, &Result);
+	CHECK_GL(glGetProgramiv, ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
 	if (InfoLogLength > 0) {
 		std::vector<char> ProgramErrorMessage(InfoLogLength + 1);
-		glGetProgramInfoLog(ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
+		CHECK_GL(glGetProgramInfoLog, ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
 		printf("%s\n", &ProgramErrorMessage[0]);
 	}
 
-	glDeleteShader(VertexShaderID);
-	glDeleteShader(FragmentShaderID);
+	CHECK_GL(glDeleteShader, VertexShaderID);
+	CHECK_GL(glDeleteShader,FragmentShaderID);
 
 	return ProgramID;
 }
@@ -204,32 +240,6 @@ GLuint loadBMP_custom(const char * imagepath){
 ////------------------------------End of Helper Functions-------------------------//
 
 
-#ifndef NDEBUG
-
-static const char *GetGLErrString(GLenum err) {
-	const char *errString = "Unknown error";
-	switch (err) {
-	case GL_INVALID_ENUM: errString = "Invalid enum"; break;
-	case GL_INVALID_VALUE: errString = "Invalid value"; break;
-	case GL_INVALID_OPERATION: errString = "Invalid operation"; break;
-	}
-	return errString;
-}
-
-#define CHECK_GL(fn, ...)  \
-	fn(__VA_ARGS__);               \
-    do { \
-	  GLenum glError = glGetError(); \
-      if (glError != GL_NO_ERROR)	{ \
-	    const char *errString = GetGLErrString(glError); \
-	    assert(false); \
-      } \
-   } \
-   while (0)
-#else
-#define CHECK_GL(fn, ...) do { fn(__VA_ARGS__); } while (0)
-#endif
-
 
 //-----------------Loading Texture functions------------------//
 bool Model::LoadCompressedTextureDXT(const string imagepath){
@@ -239,10 +249,10 @@ bool Model::LoadCompressedTextureDXT(const string imagepath){
 	int Idx = 0, NextIdx = 0;
 	std::basic_ifstream<unsigned char> input(imagepath, std::ios::in | std::ios::binary);
 	//std::ifstream input(imagepath, std::ios::binary);
-	
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
+#ifdef PBO	
+	CHECK_GL(glBindBuffer,GL_PIXEL_UNPACK_BUFFER, PboID);
 
-	blocks = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+	blocks = (GLubyte*)CHECK_GL(glMapBuffer,GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	if (blocks)
 	{
 		std::chrono::high_resolution_clock::time_point CPUload_start =
@@ -259,25 +269,63 @@ bool Model::LoadCompressedTextureDXT(const string imagepath){
 			std::chrono::duration_cast<std::chrono::duration<double>>(CPUload_end - CPUload_start);
 		//std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
 		m_CPULoad.push_back(load_time_cpu.count());
-		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+		CHECK_GL(glUnmapBuffer,GL_PIXEL_UNPACK_BUFFER);
 	}
 	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
-	glBindTexture(GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
 
-	glCompressedTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
+	CHECK_GL(glCompressedTexSubImage2D,GL_TEXTURE_2D,    // Type of texture
 		0,                // level (0 being the top level i.e. full size)
 		0, 0,             // Offset
 		kImageWidth,       // Width of the texture
 		kImageHeight,      // Height of the texture,
-		GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,          // Data format
+		GL_COMPRESSED_RGB_S3TC_DXT1_EXT,          // Data format
 		kImageWidth*kImageHeight / 2, // Type of texture data
 		0);     // 
 	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
 	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
 	m_GPULoad.push_back(GPULoad_Time.count());
 
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+#else
+
+	blocks = (uint8_t*)malloc((kImageHeight*kImageWidth / 2));
+
+	std::chrono::high_resolution_clock::time_point CPUload_start =
+		std::chrono::high_resolution_clock::now();
+
+
+	input.read(blocks, (kImageHeight*kImageWidth / 2));
+
+
+	std::chrono::high_resolution_clock::time_point CPUload_end =
+		std::chrono::high_resolution_clock::now();
+
+	std::chrono::duration<double> load_time_cpu =
+	std::chrono::duration_cast<std::chrono::duration<double>>(CPUload_end - CPUload_start);
+		//std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
+	m_CPULoad.push_back(load_time_cpu.count());
+
+
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+
+	CHECK_GL(glCompressedTexSubImage2D,GL_TEXTURE_2D,    // Type of texture
+		0,                // level (0 being the top level i.e. full size)
+		0, 0,             // Offset
+		kImageWidth,       // Width of the texture
+		kImageHeight,      // Height of the texture,
+		GL_COMPRESSED_RGB_S3TC_DXT1_EXT,          // Data format
+		kImageWidth*kImageHeight / 2, // Type of texture data
+		blocks);     // 
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
+
+	free(blocks);
+#endif
+
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
 	//stbi_image_free(Pixel);
 	return true;
@@ -356,8 +404,8 @@ bool Model::LoadTextureDataPBO(const string imagepath){
 	m_CPULoad.push_back(CPULoad_Time.count());
 
 
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
-	textureData = (GLubyte*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+	CHECK_GL(glBindBuffer,GL_PIXEL_UNPACK_BUFFER, PboID);
+	textureData = (GLubyte*)CHECK_GL(glMapBuffer,GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	if (textureData){
 
 		
@@ -371,13 +419,13 @@ bool Model::LoadTextureDataPBO(const string imagepath){
 		
 		assert(x == kImageWidth);
 		assert(y == kImageHeight);
-		glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+		CHECK_GL(glUnmapBuffer,GL_PIXEL_UNPACK_BUFFER);
 	}
 
 	
 	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
-	glBindTexture(GL_TEXTURE_2D, TextureID);
-	glTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
 		0,                // level (0 being the top level i.e. full size)
 		0, 0,             // Offset
 		kImageWidth,       // Width of the texture
@@ -386,8 +434,8 @@ bool Model::LoadTextureDataPBO(const string imagepath){
 		GL_UNSIGNED_BYTE, // Type of texture data
 		0);     // The image data to use for this texture
 
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 	
 	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
 	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
@@ -413,7 +461,18 @@ bool Model::LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu
   static const size_t kHeaderSz = sizeof(hdr);
   const size_t mem_sz = length - kHeaderSz;
 
+  //CPU file load times
+  std::chrono::high_resolution_clock::time_point CPULoad_Start =
+			std::chrono::high_resolution_clock::now();
+
   is.read(reinterpret_cast<char *>(&hdr), kHeaderSz);
+
+  std::chrono::high_resolution_clock::time_point CPULoad_End = std::chrono::high_resolution_clock::now();
+
+  std::chrono::nanoseconds CPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPULoad_End - CPULoad_Start);
+  m_CPULoad.push_back(CPULoad_Time.count());
+
+
 
   std::vector<uint8_t> cmp_data(mem_sz + 512);
   is.read(reinterpret_cast<char *>(cmp_data.data()) + 512, mem_sz);
@@ -436,6 +495,8 @@ bool Model::LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu
   offsets[7] = input_offset; input_offset += hdr.indices_sz;
 
   // Create the data for OpenCL
+
+std::chrono::high_resolution_clock::time_point GPUDecode_Start = std::chrono::high_resolution_clock::now();
   cl_int errCreateBuffer;
   cl_mem_flags flags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR | CL_MEM_HOST_NO_ACCESS;
   cl_mem cmp_buf = clCreateBuffer(ctx->GetOpenCLContext(), flags, cmp_data.size(),
@@ -456,9 +517,7 @@ bool Model::LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu
 
   // Load it
   cl_event cmp_event;
-
-    cmp_event = GenTC::LoadCompressedDXT(ctx, hdr, queue, cmp_buf, output, acquire_event);
- 
+  cmp_event = GenTC::LoadCompressedDXT(ctx, hdr, queue, cmp_buf, output, 1, &acquire_event);
 
   // Release the PBO
   cl_event release_event;
@@ -476,16 +535,24 @@ bool Model::LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu
   CHECK_CL(clReleaseEvent, release_event);
   CHECK_CL(clReleaseEvent, cmp_event);
 
+  std::chrono::high_resolution_clock::time_point GPUDecode_End = std::chrono::high_resolution_clock::now();
+  std::chrono::nanoseconds GPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPUDecode_End - GPUDecode_Start);
+  m_GPUDecode.push_back(GPUDecode_Time.count());
+
   // Copy the texture over
   GLsizei width = static_cast<GLsizei>(hdr.width);
   GLsizei height = static_cast<GLsizei>(hdr.height);
   GLsizei dxt_size = (width * height) / 2;
+
+  std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
   CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, PboID);
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
   CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D, 0, 0, 0, hdr.width, hdr.height,
-                                        GL_COMPRESSED_RGB_S3TC_DXT1_EXT, dxt_size, 0);
+                                      GL_COMPRESSED_RGB_S3TC_DXT1_EXT, dxt_size, 0);
   CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
-
+  std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+  std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+  m_GPULoad.push_back(GPULoad_Time.count());
 
 	return false;
 }
@@ -547,9 +614,49 @@ bool Model::LoadCompressedTextureCRN(const string imagepath){
 
 
 	stbi::crnd::crnd_unpack_context pContext = stbi::crnd::crnd_unpack_begin(pSrc_file_data, src_file_size);
-	
+#ifdef PBO
+	CHECK_GL(glBindBuffer,GL_PIXEL_UNPACK_BUFFER, PboID);
+	void *TextureData;
+
+	TextureData = (GLubyte*)CHECK_GL(glMapBuffer,GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+	void *CrunchPtr = TextureData;
+	if (TextureData)
+	{
+		std::chrono::high_resolution_clock::time_point CPUload_start =
+			std::chrono::high_resolution_clock::now();
+
+		stbi::crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
+
+		std::chrono::high_resolution_clock::time_point CPUload_end =
+			std::chrono::high_resolution_clock::now();
+
+		std::chrono::duration<double> load_time_cpu =
+			std::chrono::duration_cast<std::chrono::duration<double>>(CPUload_end - CPUload_start);
+		//std::cout << "CPU Load time: " << load_time_cpu.count() << "(s)" << std::endl;
+		m_CPULoad.push_back(load_time_cpu.count());
+		CHECK_GL(glUnmapBuffer,GL_PIXEL_UNPACK_BUFFER);
+	}
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+
+	CHECK_GL(glCompressedTexSubImage2D,GL_TEXTURE_2D,    // Type of texture
+		0,                // level (0 being the top level i.e. full size)
+		0, 0,             // Offset
+		kImageWidth,       // Width of the texture
+		kImageHeight,      // Height of the texture,
+		GL_COMPRESSED_RGB_S3TC_DXT1_EXT,          // Data format
+		kImageWidth*kImageHeight / 2, // Type of texture data
+		0);     // 
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
+
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
+#else
+
 	void *TextureData;
 	TextureData = malloc(kImageWidth*kImageHeight / 2);
+	void *CrunchPtr = TextureData;
 	stbi::crnd::crnd_unpack_level(pContext, &TextureData, total_face_size, row_pitch,0);
 	std::chrono::high_resolution_clock::time_point cpu_load_end =
 		std::chrono::high_resolution_clock::now();
@@ -561,22 +668,22 @@ bool Model::LoadCompressedTextureCRN(const string imagepath){
 	
 	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
 
-	glBindTexture(GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glBindTexture,GL_TEXTURE_2D, TextureID);
     //glDrawPixels
-	glCompressedTexSubImage2D(GL_TEXTURE_2D,    // Type of texture
+	CHECK_GL(glCompressedTexSubImage2D,GL_TEXTURE_2D,    // Type of texture
 		0,                // level (0 being the top level i.e. full size)
 		0, 0,             // Offset
 		kImageWidth,       // Width of the texture
 		kImageHeight,      // Height of the texture,
-		GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,          // Data format
+		GL_COMPRESSED_RGB_S3TC_DXT1_EXT,          // Data format
 		kImageWidth*kImageHeight / 2, // Type of texture data
 		TextureData);
 	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
 	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
 	m_GPULoad.push_back(GPULoad_Time.count());
-	glBindTexture(GL_TEXTURE_2D, 0);
-	
 	free(TextureData);
+#endif
+	CHECK_GL(glBindTexture,GL_TEXTURE_2D, 0);
 	return true;
 }
 
@@ -595,58 +702,63 @@ Model::Model(const char * imagepath){
 	std::vector<Vector3f> indexed_normals;
 	ObjLoader::indexVBO(vertices, uvs, normals, indices, indexed_vertices, indexed_uvs, indexed_normals);
 
-	glGenVertexArrays(1, &vertexArrayId);
-	glBindVertexArray(vertexArrayId);
+	CHECK_GL(glGenVertexArrays,1, &vertexArrayId);
+	CHECK_GL(glBindVertexArray,vertexArrayId);
 
 
-	glGenBuffers(1, &VertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, indexed_vertices.size()*sizeof(Vector3f), &indexed_vertices[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers,1, &VertexBuffer);
+	CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER, VertexBuffer);
+	CHECK_GL(glBufferData,GL_ARRAY_BUFFER, indexed_vertices.size()*sizeof(Vector3f), &indexed_vertices[0], GL_STATIC_DRAW);
 
-	glGenBuffers(1, &UVBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, UVBuffer);
-	glBufferData(GL_ARRAY_BUFFER, indexed_uvs.size()*sizeof(Vector2f), &indexed_uvs[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers,1, &UVBuffer);
+	CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER, UVBuffer);
+	CHECK_GL(glBufferData,GL_ARRAY_BUFFER, indexed_uvs.size()*sizeof(Vector2f), &indexed_uvs[0], GL_STATIC_DRAW);
 
 	glGenBuffers(1, &NormalBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
 	glBufferData(GL_ARRAY_BUFFER, indexed_normals.size()*sizeof(Vector3f), &indexed_normals[0], GL_STATIC_DRAW);
 
-	glGenBuffers(1, &IndexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers, 1, &IndexBuffer);
+	CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+	CHECK_GL(glBufferData, GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
 	numIndices = indices.size();
 	DynamicModel = false;
 }
 
 void Model::InitializeTexture(){
-	glGenTextures(1, &TextureID);
-	glBindTexture(GL_TEXTURE_2D, TextureID);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, kImageWidth, kImageHeight);	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	CHECK_GL(glGenTextures,1, &TextureID);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glTexStorage2D,GL_TEXTURE_2D, 1, GL_RGBA8, kImageWidth, kImageHeight);	
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
 
-	glGenBuffers(1, &PboID);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER,PboID);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, kImageHeight*kImageWidth * 4, 0, GL_STREAM_DRAW);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	CHECK_GL(glGenBuffers, 1, &PboID);
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER,PboID);
+	CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, kImageHeight*kImageWidth * 4, 0, GL_STREAM_DRAW);
+	CHECK_GL(glBindBuffer,GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 
 //-------Initialize compressed texture buffers----------------//
 void Model::InitializeCompressedTexture(){
 
-	glGenTextures(1, &TextureID);
-	glBindTexture(GL_TEXTURE_2D, TextureID);
-	glTexStorage2D(GL_TEXTURE_2D, 1, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, kImageWidth, kImageHeight);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	CHECK_GL(glGenTextures, 1, &TextureID);
+	CHECK_GL(glBindTexture,GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glTexStorage2D, GL_TEXTURE_2D, 1, GL_COMPRESSED_RGB_S3TC_DXT1_EXT, kImageWidth, kImageHeight);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	CHECK_GL(glTexParameteri,GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glGenBuffers(1, &PboID);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, PboID);
-	glBufferData(GL_PIXEL_UNPACK_BUFFER, (kImageHeight*kImageWidth)/2, 0, GL_STREAM_DRAW);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	CHECK_GL(glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, 0);
+
+	CHECK_GL(glGenBuffers, 1, &PboID);
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, PboID);
+	CHECK_GL(glBufferData, GL_PIXEL_UNPACK_BUFFER, (kImageHeight*kImageWidth)/2, 0, GL_STREAM_DRAW);
+	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
 
 
 }
@@ -690,26 +802,26 @@ Model::Model(bool dynamic){
 
 void Model::AllocateVertexBuffers(){
 
-	glGenVertexArrays(1, &vertexArrayId);
-	glBindVertexArray(vertexArrayId);
+	CHECK_GL(glGenVertexArrays,1, &vertexArrayId);
+	CHECK_GL(glBindVertexArray, vertexArrayId);
 
 
-	glGenBuffers(1, &VertexBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, VertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, indexed_vertices.size()*sizeof(Vector3f), &indexed_vertices[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers, 1, &VertexBuffer);
+	CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER, VertexBuffer);
+	CHECK_GL(glBufferData, GL_ARRAY_BUFFER, indexed_vertices.size()*sizeof(Vector3f), &indexed_vertices[0], GL_STATIC_DRAW);
 
-	glGenBuffers(1, &UVBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, UVBuffer);
-	glBufferData(GL_ARRAY_BUFFER, indexed_uvs.size()*sizeof(Vector2f), &indexed_uvs[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers, 1, &UVBuffer);
+	CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER, UVBuffer);
+	CHECK_GL(glBufferData, GL_ARRAY_BUFFER, indexed_uvs.size()*sizeof(Vector2f), &indexed_uvs[0], GL_STATIC_DRAW);
 
 	/*glGenBuffers(1, &NormalBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
 	glBufferData(GL_ARRAY_BUFFER, indexed_normals.size()*sizeof(Vector3f), &indexed_normals[0], GL_STATIC_DRAW);
 	*/
 
-	glGenBuffers(1, &IndexBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
+	CHECK_GL(glGenBuffers, 1, &IndexBuffer);
+	CHECK_GL(glBindBuffer, GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+	CHECK_GL(glBufferData,GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(unsigned short), &indices[0], GL_STATIC_DRAW);
 	
 	
 }
@@ -722,21 +834,22 @@ void Model::LoadTexture(){
 
 Model::~Model(){
 
-	glDeleteBuffers(1, &VertexBuffer);
-	glDeleteBuffers(1, &UVBuffer);
-	glDeleteBuffers(1, &NormalBuffer);
-	glDeleteBuffers(1, &IndexBuffer);
-	glDeleteProgram(ProgramID);
-	glDeleteTextures(1, &TextureID);
-	glDeleteBuffers(1, &PboID);
-	glDeleteVertexArrays(1, &vertexArrayId);
+	CHECK_GL(glDeleteBuffers,1, &VertexBuffer);
+	CHECK_GL(glDeleteBuffers,1, &UVBuffer);
+	CHECK_GL(glDeleteBuffers, 1, &NormalBuffer);
+	CHECK_GL(glDeleteBuffers,1, &IndexBuffer);
+	CHECK_GL(glDeleteProgram, ProgramID);
+	CHECK_GL(glDeleteTextures, 1, &TextureID);
+	CHECK_GL(glDeleteBuffers, 1, &PboID);
+	CHECK_GL(glDeleteVertexArrays, 1, &vertexArrayId);
 
 }
 
 void Model::LoadShaders(const char * vertex_file_path, const char * fragment_file_path){
 
 	ProgramID = loadShaders(vertex_file_path,fragment_file_path);
-
+	texID = CHECK_GL(glGetUniformLocation, ProgramID, "myTextureSampler");
+	MVPID = CHECK_GL(glGetUniformLocation, ProgramID, "MVP");
 }
 
 //---------------------Render function call glbind calls, glDraw calss-----------------//
@@ -748,20 +861,17 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUCo
 	Matrix4f Model = Matrix4f::Scaling(Vector3f(8.0f,6.0f,5.0f));
 	Matrix4f MVP = proj * view*Model;
 
-	glUseProgram(ProgramID);
-	glUniform1i(glGetUniformLocation(ProgramID, "myTextureSampler"), 0);
-	glUniformMatrix4fv(glGetUniformLocation(ProgramID, "MVP"), 1, GL_TRUE, (FLOAT*)&MVP);
-	glUniformMatrix4fv(glGetUniformLocation(ProgramID, "V"), 1, GL_TRUE, (FLOAT*)&view);
-	glUniformMatrix4fv(glGetUniformLocation(ProgramID, "M"), 1, GL_TRUE, (FLOAT*)&Model);
-	Vector3f lightPos(4, 4, 4);
-	glUniform3f(glGetUniformLocation(ProgramID, "LightPosition_worldspace"), lightPos.x, lightPos.y, lightPos.z);
+	CHECK_GL(glUseProgram, ProgramID);
+//	glUniform1i(, 0);
+	CHECK_GL(glUniformMatrix4fv, MVPID, 1, GL_TRUE, (FLOAT*)&MVP);
 
-	glActiveTexture(GL_TEXTURE0);
+	CHECK_GL(glActiveTexture, GL_TEXTURE0);
 
+	
+	TextureNumber = (TextureNumber + 1) % MAX_TEXTURES;
 	char cNumber[10];
 	sprintf(cNumber, "%03d", TextureNumber);
 	std::string number(cNumber);
-	TextureNumber = (TextureNumber + 1) % MAX_TEXTURES;
 	if (DynamicModel){
 		std::string imagepath;
 #ifdef JPG
@@ -786,48 +896,45 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUCo
 		
 	}
 
-	glBindTexture(GL_TEXTURE_2D, TextureID);
-	glBindVertexArray(vertexArrayId);
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+	CHECK_GL(glBindVertexArray,vertexArrayId);
 	
 
 
 
-	GLuint vertexPosition_modelspace = glGetAttribLocation(ProgramID, "vertexPosition_modelspace");
-	GLuint vertexNormal_modelspace = glGetAttribLocation(ProgramID, "vertexNormal_modelspace");
-	GLuint vertexUV = glGetAttribLocation(ProgramID, "vertexUV");
+	GLint vertexPosition_modelspace = CHECK_GL(glGetAttribLocation, ProgramID, "vertexPosition_modelspace");
+	GLint vertexUV = CHECK_GL(glGetAttribLocation, ProgramID, "vertexUV");
 
-	glEnableVertexAttribArray(vertexPosition_modelspace);
-	glEnableVertexAttribArray(vertexNormal_modelspace);
-	glEnableVertexAttribArray(vertexUV);
+	CHECK_GL(glEnableVertexAttribArray, vertexPosition_modelspace);
+	CHECK_GL(glEnableVertexAttribArray, vertexUV);
 
 
-	glBindBuffer(GL_ARRAY_BUFFER,VertexBuffer);
-	glVertexAttribPointer(vertexPosition_modelspace, 3, GL_FLOAT, GL_FALSE,0, (void*)0);
+	CHECK_GL(glBindBuffer, GL_ARRAY_BUFFER,VertexBuffer);
+	CHECK_GL(glVertexAttribPointer,vertexPosition_modelspace, 3, GL_FLOAT, GL_FALSE,0, (void*)0);
 
 	/*glBindBuffer(GL_ARRAY_BUFFER, NormalBuffer);
 	glVertexAttribPointer(vertexNormal_modelspace, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);*/
 
-	glBindBuffer(GL_ARRAY_BUFFER,UVBuffer);
-	glVertexAttribPointer(vertexUV, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER,UVBuffer);
+	CHECK_GL(glVertexAttribPointer,vertexUV, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
-	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_SHORT, NULL);
+	CHECK_GL(glBindBuffer,GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+	CHECK_GL(glDrawElements,GL_TRIANGLES, indices.size(), GL_UNSIGNED_SHORT, NULL);
 	std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
 	std::chrono::nanoseconds frame_time = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 	m_TotalFps.push_back(frame_time.count());
-	glDisableVertexAttribArray(vertexPosition_modelspace);
-	glDisableVertexAttribArray(vertexNormal_modelspace);
-	glDisableVertexAttribArray(vertexUV);
+	CHECK_GL(glDisableVertexAttribArray,vertexPosition_modelspace);
+	CHECK_GL(glDisableVertexAttribArray,vertexUV);
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	CHECK_GL(glBindBuffer,GL_ARRAY_BUFFER, 0);
+	CHECK_GL(glBindBuffer,GL_ELEMENT_ARRAY_BUFFER, 0);
 
-	glUseProgram(0);
+	CHECK_GL(glUseProgram,0);
 
 	m_numframes = m_numframes + 1;
 	if (m_numframes >= 10) {
 
-		ull CPU_load, CPU_decode, GPU_Load, FPS;
+		ull CPU_load, CPU_decode, GPU_Load, GPU_decode, FPS;
 		ull GCPU_load, GCPU_decode, GGPU_Load, GFPS;
 
 		if (!m_CPULoad.empty()) {
@@ -838,6 +945,10 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUCo
 		if (!m_CPUDecode.empty()) {
 			CPU_decode = std::accumulate(m_CPUDecode.begin(), m_CPUDecode.end(), 0) / m_CPUDecode.size();
 
+		}
+		if (!m_GPUDecode.empty()) {
+		
+			GPU_decode = std::accumulate(m_GPUDecode.begin(), m_GPUDecode.end(), 0) / m_GPUDecode.size();
 		}
 
 		if (!m_GPULoad.empty()) {
@@ -852,12 +963,14 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUCo
 
 		printf("CPU Load Time : %lld--%d\n", CPU_load, m_CPULoad.size());
 		printf("CPU Decode Time: %lld--%d\n", CPU_decode, m_CPUDecode.size());
+		printf("GPU Decode Time: %lld--%d\n", GPU_decode, m_GPUDecode.size());
 		printf("GPU Load Time: %lld--%d\n", GPU_Load, m_GPULoad.size());
 		printf("FPS: %lld--%d\n", FPS, m_TotalFps.size());
 
 		m_CPULoad.clear();
 		m_CPUDecode.clear();
 		m_GPULoad.clear();
+		m_GPUDecode.clear();
 		m_TotalFps.clear();
 
 

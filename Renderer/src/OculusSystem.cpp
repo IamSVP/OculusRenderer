@@ -39,7 +39,6 @@ void OculusSystem::initialize(){
 		printf("Oculus System Initialized\n");
 	else
 		printf("Sorry Oculus System Initialization Failed\n");
-
 }
 
 bool OculusSystem::initializeGL(const int width, const int height)
@@ -57,9 +56,6 @@ bool OculusSystem::initializeGL(const int width, const int height)
 	// Open a window and create its OpenGL context
 	window = glfwCreateWindow(width, height, "Oculus Renderer", NULL, NULL);
 
-	// Set mouse position to the center
-	glfwSetCursorPos(window, winWidth / 2, winHeight / 2);
-
 	if (window == NULL)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 3.3 compatible. Try the 2.1 version of the tutorials.\n");
@@ -67,6 +63,9 @@ bool OculusSystem::initializeGL(const int width, const int height)
 		return false;
 	}
 	
+	// Set mouse position to the center
+	glfwSetCursorPos(window, winWidth / 2, winHeight / 2);
+
 	glfwMakeContextCurrent(window);
 	// Putting VSync OFF , Oculus SDK controls the frame rate
 	glfwSwapInterval(0);
@@ -79,8 +78,8 @@ bool OculusSystem::initializeGL(const int width, const int height)
 
 	OVR::GLEContext::SetCurrentContext(&gleContext);
 	gleContext.PlatformInit();
-          int attribList[] = { WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 2, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB };
-            HGLRC h = wglCreateContextAttribsARB(wglGetCurrentDC(), wglGetCurrentContext(), attribList);
+    int attribList[] = { WGL_CONTEXT_MAJOR_VERSION_ARB, 3, WGL_CONTEXT_MINOR_VERSION_ARB, 2, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_DEBUG_BIT_ARB, 0 };
+    HGLRC h = wglCreateContextAttribsARB(wglGetCurrentDC(), wglGetCurrentContext(), attribList);
 	gleContext.Init();
 
 
