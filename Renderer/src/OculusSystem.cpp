@@ -188,7 +188,8 @@ void OculusSystem::render(){
 	scene->CreateScene();
 
 	glEnable(GL_DEPTH_TEST);
-	Vector3f Pos2(0.0f, 0.0f, 10.0f);
+	//glCullFace(GL_CW);
+	Vector3f Pos2(0.0f, 0.0f, 0.0f);
 
 	bool isVisible = true;
 

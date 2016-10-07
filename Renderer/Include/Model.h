@@ -62,8 +62,9 @@ public:
 
 
 
-
+	void InitializeTextures();
 	void InitializeTexture();
+	void InitializeTextureRGB();
 	void InitializeCompressedTexture();
 
 	bool LoadTextureData(const string imagepath);
@@ -74,7 +75,7 @@ public:
 	bool LoadCompressedTextureCRN(const string imagepath);
 	bool LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu::GPUContext> &ctx);
 	void RenderDynamicModel(Matrix4f view, Matrix4f proj);
-
+	void loadBMP_custom(const char * imagepath, GLuint texID, GLuint pbo);
 
 	Vector3f Postion;
 	Quatf Rotation;
@@ -96,9 +97,12 @@ public:
 	GLuint PboID;
 	GLuint MVPID;
 	GLuint texID;
+	GLuint GPULoadQuery[2];
+	
 
 
-	uint32_t m_numframes;
+	uint64_t m_numframes = 0;
+	uint64_t m_loopframecount = 0;
 	std::vector<ull> m_CPULoad;
 	std::vector<ull> m_CPUDecode;
 	std::vector<ull> m_GPULoad;
@@ -107,9 +111,10 @@ public:
 	std::string m_TexturePath;
 	std::string m_TexturePathDXT;
 	std::string m_TexturePathJPG;
+	std::string m_TexturePathBMP;
 	std::string m_TexturePathGTC;
 	std::string m_TexturePathCRN;
-
+	
 	//OpenCL context;
 
 	bool DynamicModel;
