@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+
 #include <fstream>
 #include <algorithm>
 using namespace std;
@@ -22,6 +23,7 @@ using namespace std;
 #include "Kernel/OVR_Log.h"
 #include "OVR_CAPI_GL.h"
 #include "TextureLoader.h"
+#include "decoder.h"
 #include <vector>
 using namespace OVR;
 
@@ -66,11 +68,13 @@ public:
 	void InitializeTexture();
 	void InitializeTextureRGB();
 	void InitializeCompressedTexture();
+	void InitializeMPTC();
 
 	bool LoadTextureData(const string imagepath);
 	bool LoadTextureDataJPG(const string imagepath);
 	bool LoadTextureDataPBO(const string imagepath);
 	bool CompressImage(const string imagepath);
+	bool LoadCompressedTextureMPTC();
 	bool LoadCompressedTextureDXT(const string imagepath);
 	bool LoadCompressedTextureCRN(const string imagepath);
 	bool LoadCompressedTextureGTC(const string imagepath, std::unique_ptr<gpu::GPUContext> &ctx);
@@ -114,7 +118,12 @@ public:
 	std::string m_TexturePathBMP;
 	std::string m_TexturePathGTC;
 	std::string m_TexturePathCRN;
+	std::string m_MPTC_file_path;
 	
+
+	//MPTC stuff
+	BufferStruct *ptr_buffer_struct;
+	std::ifstream mptc_file_stream;
 	//OpenCL context;
 
 	bool DynamicModel;

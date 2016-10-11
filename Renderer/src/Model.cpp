@@ -9,6 +9,7 @@
 #include <iomanip>
 
 #include "stb_image.h"
+
 namespace stbi {
 
 
@@ -17,16 +18,17 @@ namespace stbi {
 
 #define FOURK
 //#define TWOK
-//#define CRN
+#define CRN
 //#define GTC
-#define DXT1
+//#define DXT1
 //#define JPG
 //#define BMP
+//#define MPTC
 #define PBO
 #define MAX_TEXTURES 580
 
 #ifdef FOURK
-#if (defined GTC) || (defined JPG) || (defined BMP) || (defined CRN)
+#if (defined GTC) || (defined JPG) || (defined BMP) || (defined CRN) || (defined MPTC)
 static const size_t kImageWidth = 3584; 
 static const size_t kImageHeight = 1792;
 #else
@@ -261,6 +263,38 @@ GLuint loadShaders(const char * vertex_file_path, const char * fragment_file_pat
 
 
 ////------------------------------End of Helper Functions-------------------------//
+
+
+///////////////////////////////Loading from MPTC//////////////////////////////
+bool Model::LoadCompressedTextureMPTC() {
+
+	PhysicalDXTBlock * curr_dxt;
+	std::chrono::high_resolution_clock::time_point CPUDecode_Start = std::chrono::high_resolution_clock::now();
+	GetBufferedFrame(ptr_buffer_struct, curr_dxt, mptc_file_stream);
+	std::chrono::high_resolution_clock::time_point CPUDecode_End = std::chrono::high_resolution_clock::now();
+
+	std::chrono::nanoseconds CPUDecode_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(CPUDecode_End - CPUDecode_Start);
+	m_CPUDecode.push_back(CPUDecode_Time.count());
+
+	std::chrono::high_resolution_clock::time_point GPULoad_Start = std::chrono::high_resolution_clock::now();
+	CHECK_GL(glBindTexture, GL_TEXTURE_2D, TextureID);
+
+	CHECK_GL(glCompressedTexSubImage2D, GL_TEXTURE_2D,    // Type of texture
+		0,                // level (0 being the top level i.e. full size)
+		0, 0,             // Offset
+		kImageWidth,       // Width of the texture
+		kImageHeight,      // Height of the texture,
+		GL_COMPRESSED_RGB_S3TC_DXT1_EXT,          // Data format
+		kImageWidth*kImageHeight / 2, // Type of texture data
+		curr_dxt);     // 
+	std::chrono::high_resolution_clock::time_point GPULoad_End = std::chrono::high_resolution_clock::now();
+	std::chrono::nanoseconds GPULoad_Time = std::chrono::duration_cast<std::chrono::nanoseconds>(GPULoad_End - GPULoad_Start);
+	m_GPULoad.push_back(GPULoad_Time.count());
+
+	return true;
+}
+
+
 
 //-----------------Loading Texture functions------------------//
 bool Model::LoadCompressedTextureDXT(const string imagepath){
@@ -853,6 +887,9 @@ void Model::InitializeTextures() {
 	InitializeCompressedTexture();
 #elif (defined BMP)
 	InitializeTextureRGB();
+#elif (defined MPTC)
+	InitializeMPTC();
+	InitializeCompressedTexture();
 #else
 	InitializeTexture();
 #endif
@@ -916,6 +953,23 @@ void Model::InitializeCompressedTexture(){
 	CHECK_GL(glBindBuffer, GL_PIXEL_UNPACK_BUFFER, 0);
 
 
+}
+
+void Model::InitializeMPTC()
+{
+	uint32_t num_blocks = kImageHeight / 4 * kImageWidth / 4;
+	mptc_file_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+	mptc_file_stream.open(m_MPTC_file_path.c_str(), std::ios::binary);
+	std::cout << "(infile) = " << mptc_file_stream.is_open() << std::endl;
+	std::cout << "(infile.fail()) = " << mptc_file_stream.fail() << std::endl;
+	
+	ptr_buffer_struct = (BufferStruct*)malloc(sizeof(BufferStruct));
+	InitBufferedDecode(4, ptr_buffer_struct, mptc_file_stream, num_blocks);
+
+	assert(ptr_buffer_struct->ptr_decode_info != NULL);
+	for (uint8_t idx = 0; idx < 4; idx++)
+		assert(ptr_buffer_struct->buffered_dxts[idx] != NULL);
 }
 
 
@@ -1051,6 +1105,10 @@ Model::Model(const char * imagepath, bool dynamic){
 	m_TexturePathGTC = m_TexturePath + "GTC-16\\360MegaC4K";
 #endif	
 
+#ifdef MPTC
+	m_MPTC_file_path = "Test.mpt";
+#endif
+
 
 	// Initialize timer for GPU load timmmings 
 
@@ -1083,7 +1141,9 @@ Model::Model(bool dynamic){
 	m_TexturePathGTC = m_TexturePath + "GTC-256\\360MegaC4K";
 #endif	
 
-
+#ifdef MPTC
+	m_MPTC_file_path = "Test.mpt";
+#endif
 	// Initialize timer for GPU load timmmings 
 
 	glGenQueries(2, GPULoadQuery);
@@ -1217,6 +1277,10 @@ void Model::RenderModel(Matrix4f view, Matrix4f proj, std::unique_ptr<gpu::GPUCo
 #ifdef GTC
 			imagepath = m_TexturePathGTC + number + ".gtc";
 			LoadCompressedTextureGTC(imagepath, ctx);
+#endif
+
+#ifdef MPTC
+			LoadCompressedTextureMPTC();
 #endif
 
 		}
